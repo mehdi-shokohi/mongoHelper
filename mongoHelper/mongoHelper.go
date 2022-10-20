@@ -17,6 +17,13 @@ import (
 
 var ErrorInsertFailed = errors.New("insert failed with no error")
 
+func NewMongo[T any](ctx context.Context, colName string, model T) *MongoContainer[T] {
+	m := new(MongoContainer[T])
+	m.Model = model
+	m.Ctx = ctx
+	m.CollectionName = colName
+	return m
+}
 
 type Transaction struct {
 	WMongo     *db.MongoWriteDB
@@ -42,7 +49,7 @@ func (t *Transaction) EndTransaction(f func(sessionContext mongo.SessionContext)
 	}
 	resp, err := session.WithTransaction(context.Background(), f, txnOpts)
 	if err != nil {
-		err=session.AbortTransaction(context.Background())
+		err = session.AbortTransaction(context.Background())
 	}
 
 	defer session.EndSession(context.Background())
@@ -63,97 +70,77 @@ type MongoContainer[T any] struct {
 	CollectionName string
 }
 
-func NewMongo[T any](ctx context.Context, colName string, model T) *MongoContainer[T] {
-	m := new(MongoContainer[T])
-	m.Model = model
-	m.Ctx = ctx
-	m.CollectionName = colName
-	return m
+func (m *MongoContainer[T]) ConnectionManager(Op func(ctx context.Context, collection *mongo.Collection) (interface{}, error)) (interface{}, error) {
+	return (func() (interface{}, error) {
+		var collection *mongo.Collection
+		if cs, ok := m.Ctx.(mongo.SessionContext); ok {
+			collection = cs.Client().Database(conf.GetMongodbName()).Collection(m.CollectionName)
+		} else {
+			var release func()
+			collection, release = GetCollection(m.CollectionName)
+			defer release()
+		}
+		return Op(m.Ctx, collection)
+	}())
 }
+
 func (m *MongoContainer[T]) Insert() (result interface{}, err error) {
 
-	var collection *mongo.Collection
-	if cs, ok := m.Ctx.(mongo.SessionContext); ok {
-		collection = cs.Client().Database(conf.GetMongodbName()).Collection(m.CollectionName)
-	} else {
-		var release func()
-		collection, release = GetCollection(m.CollectionName)
-		defer release()
-	}
+	return m.ConnectionManager(func(ctx context.Context, collection *mongo.Collection) (interface{}, error) {
 
-	insertResult, err := collection.InsertOne(m.Ctx, m.Model)
-	if err != nil {
+		insertResult, err := collection.InsertOne(m.Ctx, m.Model)
+		if err != nil {
 
-		return nil, err
-	}
-	if insertResult == nil {
-		return nil, ErrorInsertFailed
-	}
+			return nil, err
+		}
+		if insertResult == nil {
+			return nil, ErrorInsertFailed
+		}
 
-	return insertResult, err
+		return insertResult, err
+	})
 }
-
 
 func (m *MongoContainer[T]) Update(newValue T, findCondition bson.D) (result interface{}, err error) {
 
-	var collection *mongo.Collection
-	if cs, ok := m.Ctx.(mongo.SessionContext); ok {
-		collection = cs.Client().Database(conf.GetMongodbName()).Collection(m.CollectionName)
-	} else {
-		var release func()
-		collection, release = GetCollection(m.CollectionName)
-		defer release()
-	}
+	return m.ConnectionManager(func(ctx context.Context, collection *mongo.Collection) (interface{}, error) {
+		updateFilter := bson.D{{Key: "$set", Value: newValue}}
+		updatedResult, err := collection.UpdateOne(m.Ctx, findCondition, updateFilter)
+		if err != nil {
+			return nil, err
 
-	updateFilter := bson.D{{Key: "$set", Value: newValue}}
-	updatedResult, err := collection.UpdateOne(m.Ctx, findCondition, updateFilter)
-	if err != nil {
-		return nil, err
-
-	}
-	if updatedResult == nil || updatedResult.MatchedCount == 0 {
-		return nil, mongo.ErrNoDocuments
-		return
-	}
-	return updatedResult, err
+		}
+		if updatedResult == nil || updatedResult.MatchedCount == 0 {
+			return nil, mongo.ErrNoDocuments
+		}
+		return updatedResult, err
+	})
 }
 func (m *MongoContainer[T]) UpdateMany(filter interface{}, update interface{}, options ...*options.UpdateOptions) (result interface{}, err error) {
+	return m.ConnectionManager(func(ctx context.Context, collection *mongo.Collection) (interface{}, error) {
+		updatedResult, err := collection.UpdateMany(m.Ctx, filter, update, options...)
+		if err != nil {
+			return nil, err
 
-	var collection *mongo.Collection
-	if cs, ok := m.Ctx.(mongo.SessionContext); ok {
-		collection = cs.Client().Database(conf.GetMongodbName()).Collection(m.CollectionName)
-	} else {
-		var release func()
-		collection, release = GetCollection(m.CollectionName)
-		defer release()
-	}
-	updatedResult, err := collection.UpdateMany(m.Ctx, filter, update, options...)
-	if err != nil {
-		return nil, err
+		}
+		if updatedResult == nil {
+			return nil, mongo.ErrNoDocuments
 
-	}
-	if updatedResult == nil {
-		return nil, mongo.ErrNoDocuments
-
-	}
-	return updatedResult, nil
+		}
+		return updatedResult, nil
+	})
 }
-func (m *MongoContainer[T]) FindOne(query *bson.D, options ...*options.FindOneOptions) (interface{}, error) {
-	var collection *mongo.Collection
-	if cs, ok := m.Ctx.(mongo.SessionContext); ok {
-		collection = cs.Client().Database(conf.GetMongodbName()).Collection(m.CollectionName)
-	} else {
-		var release func()
-		collection, release = GetCollection(m.CollectionName)
-		defer release()
-	}
-	one := collection.FindOne(m.Ctx, query, options...)
-	err := one.Decode(m.Model)
-	if err == nil {
-		return one, nil
-	}
 
-	return nil, err
+func (m *MongoContainer[T]) FindOne(query *bson.D, options ...*options.FindOneOptions) (interface{}, error) {
+	return m.ConnectionManager(func(ctx context.Context, collection *mongo.Collection) (interface{}, error) {
+		one := collection.FindOne(m.Ctx, query, options...)
+		err := one.Decode(m.Model)
+		if err == nil {
+			return m.Model, nil
+		}
+
+		return nil, err
+	})
 }
 
 func (m *MongoContainer[T]) FindAll(query *bson.D, opts ...*options.FindOptions) ([]*T, error) {
@@ -186,58 +173,36 @@ func (m *MongoContainer[T]) FindAll(query *bson.D, opts ...*options.FindOptions)
 }
 
 func (m *MongoContainer[T]) FindByID(id interface{}) (interface{}, error) {
-	var collection *mongo.Collection
-	if cs, ok := m.Ctx.(mongo.SessionContext); ok {
-		collection = cs.Client().Database(conf.GetMongodbName()).Collection(m.CollectionName)
-	} else {
-		var release func()
-		collection, release = GetCollection(m.CollectionName)
-		defer release()
-	}
-	one := collection.FindOne(m.Ctx, &bson.D{{Key: "_id", Value: id}})
-	err := one.Err()
-	if err != nil {
+	return m.ConnectionManager(func(ctx context.Context, collection *mongo.Collection) (interface{}, error) {
+		one := collection.FindOne(m.Ctx, &bson.D{{Key: "_id", Value: id}})
+		err := one.Err()
+		if err != nil {
 
-		return nil, err
-	}
-	err = one.Decode(m.Model)
-	return one, err
+			return nil, err
+		}
+		err = one.Decode(m.Model)
+		return one, err
+	})
 }
 
 func (m *MongoContainer[T]) DeleteOne(b *bson.D, opts ...*options.DeleteOptions) (result interface{}, err error) {
+	return m.ConnectionManager(func(ctx context.Context, collection *mongo.Collection) (interface{}, error) {
+		delete, err := collection.DeleteOne(m.Ctx, b, opts...)
+		if err != nil {
+			return nil, err
+		}
 
-	var collection *mongo.Collection
-	if cs, ok := m.Ctx.(mongo.SessionContext); ok {
-		collection = cs.Client().Database(conf.GetMongodbName()).Collection(m.CollectionName)
-	} else {
-		var release func()
-		collection, release = GetCollection(m.CollectionName)
-		defer release()
-	}
-
-	delete, err := collection.DeleteOne(m.Ctx, b, opts...)
-	if err != nil {
-		return nil, err
-	}
-
-	return delete, nil
+		return delete, nil
+	})
 }
 
 func (m *MongoContainer[T]) DeleteMany(b *bson.D, opts ...*options.DeleteOptions) (result interface{}, err error) {
-
-	var collection *mongo.Collection
-	if cs, ok := m.Ctx.(mongo.SessionContext); ok {
-		collection = cs.Client().Database(conf.GetMongodbName()).Collection(m.CollectionName)
-	} else {
-		var release func()
-		collection, release = GetCollection(m.CollectionName)
-		defer release()
-	}
-
-	delCount, err := collection.DeleteMany(m.Ctx, b, opts...)
-	if err != nil {
-		return nil, err
-	}
-
-	return delCount, nil
+	return m.ConnectionManager(func(ctx context.Context, collection *mongo.Collection) (interface{}, error){
+		delCount, err := collection.DeleteMany(m.Ctx, b, opts...)
+		if err != nil {
+			return nil, err
+		}
+	
+		return delCount, nil
+	})
 }
