@@ -173,7 +173,7 @@ func (m *MongoContainer[T]) FindAll(query *bson.D, opts ...*options.FindOptions)
 	for cur.Next(m.Ctx) {
 		//Create a value into which the single document can be decoded
 		elem := new(T)
-		err := cur.Decode(&elem)
+		err := cur.Decode(elem)
 		if err != nil {
 			log.Fatal(err)
 		}
