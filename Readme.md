@@ -3,7 +3,7 @@
 	config.SetConfig(config.Config{
 		MongoAddress: "mongodb://localhost:27018/?readPreference=primary&appname=MongoDB%20Compass&directConnection=true&ssl=false",
 		MongoDbName: "goex" ,
-		}) // once run . In Main Func
+		}) // run once . In Main Func
 
 
 	userModel := new(Model)
