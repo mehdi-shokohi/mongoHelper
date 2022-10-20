@@ -45,4 +45,23 @@ func TestMongoHelper(t *testing.T) {
 	fmt.Println(userModel.Password)
 	fmt.Println(userModel.Admin)
 
+
+	// Map 
+	userMap:=make(map[string]interface{})
+	dbMap := mongoHelper.NewMongo(context.Background(),"users", userMap)
+	_, err = dbMap.FindOne(&bson.D{{Key: "username", Value: "admin"}, {Key: "password", Value: "1234"}})
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			fmt.Println("user not found ")
+		} else {
+			fmt.Println(err.Error())
+		}
+	}
+
+	fmt.Println(userMap["_id"].(primitive.ObjectID).Hex())
+	fmt.Println(userMap["username"])
+	fmt.Println(userMap["password"])
+	fmt.Println(userMap["admin"])
+
+
 }
