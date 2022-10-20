@@ -1,4 +1,4 @@
-####Impl By Struct Model
+#### Impl By Struct Model
 ```go
 	config.SetConfig(config.Config{
 		MongoAddress: "mongodb://localhost:27018/?readPreference=primary&appname=MongoDB%20Compass&directConnection=true&ssl=false",
@@ -23,7 +23,7 @@
 	fmt.Println(userModel.Admin)
 
 ```
-####Impl by Map 
+#### Impl by Map 
 
 ```go
 
