@@ -6,7 +6,7 @@
 
 
 	userModel := new(Model)
-	db := mongoHelper.NewMongo(context.Background(), userModel)
+	db := mongoHelper.NewMongo(context.Background(),"users", userModel)
 	_, err := db.FindOne(&bson.D{{Key: "username", Value: "admin"}, {Key: "password", Value: "1234"}})
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
