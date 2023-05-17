@@ -183,6 +183,42 @@ func (m *MongoContainer[T]) CountDocuments(query *bson.D) (interface{}, error) {
 
 }
 
+// Aggregate as you know aggregate mongo pipeline!
+func (m *MongoContainer[T]) Aggregate(pipeline mongo.Pipeline, opts ...*options.AggregateOptions) (result []T, err error) {
+	var collection *mongo.Collection
+	if cs, ok := m.Ctx.(mongo.SessionContext); ok {
+		collection = cs.Client().Database(conf.GetMongodbName()).Collection(m.CollectionName)
+	} else {
+		var release func()
+		collection, release = GetCollection(m.CollectionName)
+		defer release()
+	}
+
+	aggResult, err := collection.Aggregate(m.Ctx, pipeline, opts...)
+	if err != nil {
+		return nil, err
+	}
+	results := make([]T, 0)
+
+	for aggResult.Next(m.Ctx) {
+		//Create a value into which the single document can be decoded
+		elem := new(T)
+		err := aggResult.Decode(elem)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		results = append(results, *elem)
+
+	}
+
+	if err := aggResult.Close(m.Ctx); err != nil {
+		return nil, err
+	}
+	return results, nil
+
+}
+
 func (m *MongoContainer[T]) FindByID(id interface{}) (interface{}, error) {
 	return m.ConnectionManager(func(ctx context.Context, collection *mongo.Collection) (interface{}, error) {
 		one := collection.FindOne(m.Ctx, &bson.D{{Key: "_id", Value: id}})
