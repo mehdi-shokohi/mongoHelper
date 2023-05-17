@@ -71,7 +71,7 @@ type MongoContainer[T any] struct {
 }
 
 func (m *MongoContainer[T]) ConnectionManager(Op func(ctx context.Context, collection *mongo.Collection) (interface{}, error)) (interface{}, error) {
-	return (func() (interface{}, error) {
+	return func() (interface{}, error) {
 		var collection *mongo.Collection
 		if cs, ok := m.Ctx.(mongo.SessionContext); ok {
 			collection = cs.Client().Database(conf.GetMongodbName()).Collection(m.CollectionName)
@@ -81,7 +81,7 @@ func (m *MongoContainer[T]) ConnectionManager(Op func(ctx context.Context, colle
 			defer release()
 		}
 		return Op(m.Ctx, collection)
-	}())
+	}()
 }
 
 func (m *MongoContainer[T]) Insert() (result interface{}, err error) {
@@ -168,8 +168,19 @@ func (m *MongoContainer[T]) FindAll(query *bson.D, opts ...*options.FindOptions)
 		results = append(results, elem)
 
 	}
-	cur.Close(m.Ctx)
+
+	if err := cur.Close(m.Ctx); err != nil {
+		return nil, err
+	}
 	return results, nil
+}
+
+// CountDocuments returns total documents founded by query.
+func (m *MongoContainer[T]) CountDocuments(query *bson.D) (interface{}, error) {
+	return m.ConnectionManager(func(ctx context.Context, collection *mongo.Collection) (interface{}, error) {
+		return collection.CountDocuments(ctx, query)
+	})
+
 }
 
 func (m *MongoContainer[T]) FindByID(id interface{}) (interface{}, error) {
@@ -197,12 +208,12 @@ func (m *MongoContainer[T]) DeleteOne(b *bson.D, opts ...*options.DeleteOptions)
 }
 
 func (m *MongoContainer[T]) DeleteMany(b *bson.D, opts ...*options.DeleteOptions) (result interface{}, err error) {
-	return m.ConnectionManager(func(ctx context.Context, collection *mongo.Collection) (interface{}, error){
+	return m.ConnectionManager(func(ctx context.Context, collection *mongo.Collection) (interface{}, error) {
 		delCount, err := collection.DeleteMany(m.Ctx, b, opts...)
 		if err != nil {
 			return nil, err
 		}
-	
+
 		return delCount, nil
 	})
 }
