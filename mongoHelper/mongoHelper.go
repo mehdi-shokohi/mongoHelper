@@ -162,7 +162,7 @@ func (m *MongoContainer[T]) FindAll(query *bson.D, opts ...*options.FindOptions)
 		elem := new(T)
 		err := cur.Decode(elem)
 		if err != nil {
-			log.Fatal(err)
+			log.Println(err)
 		}
 
 		results = append(results, elem)
@@ -205,7 +205,7 @@ func (m *MongoContainer[T]) Aggregate(pipeline mongo.Pipeline, opts ...*options.
 		elem := new(T)
 		err := aggResult.Decode(elem)
 		if err != nil {
-			log.Fatal(err)
+			log.Println(err)
 		}
 
 		results = append(results, *elem)
