@@ -19,7 +19,7 @@ type User struct {
 	Status   string              `json:"status" bson:"status"`
 }
 
-const uri = "mongodb://localhost:27018/?readPreference=primary&appname=MongoDB%20Compass&directConnection=true&ssl=false"
+const uri = "mongodb://localhost:27018/?readPreference=primary&appname=GOmongoHelper&directConnection=true&ssl=false"
 const dbId = "mongo_rw_partition_1"
 const database = "contents"
 
