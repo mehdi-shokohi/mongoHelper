@@ -1,83 +1,59 @@
-package main
+package mongoHelper
 
-import "testing"
-import "github.com/mehdi-shokohi/mongoHelper/config"
-import "go.mongodb.org/mongo-driver/bson/primitive"
-import "go.mongodb.org/mongo-driver/bson"
-import "go.mongodb.org/mongo-driver/mongo"
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"testing"
 
-import "github.com/mehdi-shokohi/mongoHelper/mongoHelper"
-import "context"
-import "fmt"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+)
 
 
+type User struct {
+	ID       *primitive.ObjectID `json:"id,omitempty"   bson:"_id,omitempty"`
+	Password string              `json:"password,omitempty"   bson:"password"`
+	Username string              `json:"username"   bson:"userName"`
+	Status   string              `json:"status" bson:"status"`
+}
+var db *mongo.Client
+func NewMongo[T any](ctx context.Context, colName string, model T) MongoContainer[T] {
+	if db==nil{
 
-
+		db=New("mongo_rnj_rw#1","mongodb://localhost:27018/rainjoy?readPreference=primary&appname=MongoDB%20Compass&directConnection=true&ssl=false")
+	}
+	m := MongoContainer[T]{}
+	m.Model = model
+	m.Ctx = ctx
+	m.DatabaseName = "rainjoy"
+	m.Connection ,_= Holder.Read("mongo_rnj_rw#1")
+	m.CollectionName = colName
+	return m
+}
 func TestMongoHelper(t *testing.T) {
-	config.SetConfig(config.Config{
-		MongoAddress: "mongodb://localhost:27018/?readPreference=primary&appname=MongoDB%20Compass&directConnection=true&ssl=false",
-		MongoDbName:  "goex",
-	}) // once run . In Main Func
 
-	userModel := new(Model)
-	db := mongoHelper.NewMongo(context.Background(), "users", userModel)
-	_, err := db.FindOne(&bson.D{{Key: "username", Value: "admin"}, {Key: "password", Value: "1234"}})
-	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			fmt.Println("user not found ")
-			return
-
-		} else {
-			fmt.Println(err.Error())
-			return
-
-		}
+db:=NewMongo(context.TODO(),"test",User{})
+finded,err:=db.FindAll(&bson.D{{"userName","mehdi"}})
+if err!=nil{
+	fmt.Println(err)
+}
+users,_:=json.Marshal(finded)
+fmt.Println(string(users))
+tr:=StartTransaction("mongo_rnj_rw#1",context.Background())
+res,err :=tr.EndTransaction(func(sessionContext mongo.SessionContext) (result interface{}, err error) {
+	db:=NewMongo(sessionContext,"test",User{Username: "mehdi",Password: "1234"})
+	db.Insert()
+	db2:=NewMongo(sessionContext,"test2",User{Username: "mate",Password: "1234"})
+	res,err:= db2.Insert()
+	if err==nil{
+		return res,errors.New("Abort transaction")
 	}
-
-	fmt.Println(userModel.ID.Hex())
-	fmt.Println(userModel.Username)
-	fmt.Println(userModel.Password)
-	fmt.Println(userModel.Admin)
-
-	// Map
-	dbMap := mongoHelper.NewMongo(context.Background(), "users", map[string]interface{}{})
-	userMap, err := dbMap.FindAll(&bson.D{})
-	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			fmt.Println("user not found ")
-			return
-		} else {
-			fmt.Println(err.Error())
-			return
-
-		}
-	}
-	fmt.Println(len(userMap))
-	for _, v := range userMap {
-		fmt.Println((*v)["_id"].(primitive.ObjectID).Hex())
-		fmt.Println((*v)["username"])
-		fmt.Println((*v)["password"])
-		fmt.Println((*v)["admin"])
-	}
+	return res,err
+})
 
 
-
-	// Extended Helper
-	db2 := MyNewMongo(context.Background(), "users", &Model{})
-	userModel2, err2 := db2.MyFindOne(&bson.D{{Key: "username", Value: "naser"}, {Key: "password", Value: "1234"}})
-	if err2 != nil {
-		if err2 == mongo.ErrNoDocuments {
-			fmt.Println("user not found ")
-			return 
-		} else {
-			fmt.Println(err.Error())
-			return 
-		}
-	}
-
-	fmt.Println(userModel2.ID.Hex())
-	fmt.Println(userModel2.Username)
-	fmt.Println(userModel2.Password)
-	fmt.Println(userModel2.Admin)
-
+fmt.Println(res)
 }
