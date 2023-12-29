@@ -19,19 +19,14 @@ type User struct {
 	Status   string              `json:"status" bson:"status"`
 }
 
-var db *mongo.Client
+const uri = "mongodb://localhost:27018/?readPreference=primary&appname=MongoDB%20Compass&directConnection=true&ssl=false"
+const dbId = "mongo_rw_partition_1"
+const database = "contents"
 
-func NewMongo[T any](ctx context.Context, colName string, model T) MongoContainer[T] {
-	if db == nil {
-		db = New("mongo_rnj_rw#1", "mongodb://localhost:27018/rainjoy?readPreference=primary&appname=MongoDB%20Compass&directConnection=true&ssl=false")
-	}
-	m := MongoContainer[T]{}
-	m.Model = model
-	m.Ctx = ctx
-	m.DatabaseName = "rainjoy"
-	m.Connection= db
-	m.CollectionName = colName
-	return m
+
+func NewMongo[T any](ctx context.Context,collection string , model T)MongoContainer[T]{
+	db:=NewMongoById(ctx,dbId,uri,database,collection,model)
+	return db
 }
 func TestMongoHelper(t *testing.T) {
 
@@ -42,8 +37,11 @@ func TestMongoHelper(t *testing.T) {
 	}
 	users, _ := json.Marshal(finded)
 	fmt.Println(string(users))
-	tr := StartTransaction("mongo_rnj_rw#1", context.Background())
-	res, err := tr.EndTransaction(func(sessionContext mongo.SessionContext) (result interface{}, err error) {
+	tr,err := StartTransaction(dbId, context.Background())
+	if err!=nil{
+		return 
+	}
+	transFn:=func(sessionContext mongo.SessionContext) (result interface{}, err error) {
 		db := NewMongo(sessionContext, "test", User{Username: "mehdi", Password: "1234"})
 		db.Insert()
 		db2 := NewMongo(sessionContext, "test2", User{Username: "mate", Password: "1234"})
@@ -52,7 +50,7 @@ func TestMongoHelper(t *testing.T) {
 			return res, errors.New("Abort transaction")
 		}
 		return res, err
-	})
-
+	}
+	res,err :=tr.EndTransaction(transFn)
 	fmt.Println(res)
 }

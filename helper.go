@@ -32,14 +32,19 @@ func connect(uri string)(*mongo.Client,error){
 	return c,err
 }
 
-
+func GetClientById(key string)(*mongo.Client,bool){
+	if Holder==nil{
+		Init()
+	}
+	return Holder.read(key)
+}
 func New(Id ,Uri string) *mongo.Client {
 	if Holder==nil{
 		Init()
 	}
 	c,err:=connect(Uri)
 	if err==nil{
-		Holder.Write(Id,c)
+		Holder.write(Id,c)
 	}
 	return c
 }

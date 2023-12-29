@@ -11,7 +11,7 @@ type ConnManager struct {
 }
 
 
-func (d *ConnManager) Read(key string) (*mongo.Client, bool) {
+func (d *ConnManager) read(key string) (*mongo.Client, bool) {
 	d.mutex.RLock()
 
 	defer d.mutex.RUnlock()
@@ -19,13 +19,13 @@ func (d *ConnManager) Read(key string) (*mongo.Client, bool) {
 	return val, exists
 }
 
-func (d *ConnManager) Write(key string, value *mongo.Client) {
+func (d *ConnManager) write(key string, value *mongo.Client) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 	d.holder[key] = value
 }
 
-func (d *ConnManager) Delete(key string)  {
+func (d *ConnManager) delete(key string)  {
 	d.mutex.RLock()
 
 	defer d.mutex.RUnlock()

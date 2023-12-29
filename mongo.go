@@ -14,16 +14,32 @@ import (
 
 var ErrorInsertFailed = errors.New("insert failed with no error")
 
+func NewMongoById[T any](ctx context.Context, dbId,uri,dbName,colName string, model T) MongoContainer[T] {
+	m := MongoContainer[T]{}
+	RWdb,exist:= GetClientById(dbId)
+	if !exist {
+		RWdb = New(dbId, uri)
+	}
+	m.Connection = RWdb
+
+	m.Model = model
+	m.Ctx = ctx
+	m.DatabaseName = dbName
+	m.CollectionName = colName
+	return m
+}
 type Transaction struct {
 	connection *mongo.Client
 	ctx        context.Context
 }
 
-func StartTransaction(Id string, ctx context.Context) Transaction {
+func StartTransaction(Id string, ctx context.Context) (Transaction,error) {
 	tr := Transaction{}
+	dbc, exist := GetClientById(Id)
+	if !exist{ return tr,errors.New("connection Id not found.")}
 	tr.ctx = ctx
-	tr.connection, _ = Holder.Read(Id)
-	return tr
+	tr.connection = dbc
+	return tr,nil
 }
 
 func (t *Transaction) EndTransaction(f func(sessionContext mongo.SessionContext) (result interface{}, err error)) (interface{}, error) {
