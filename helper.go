@@ -3,6 +3,7 @@ package mongoHelper
 import (
 	"context"
 
+
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -15,20 +16,13 @@ func Init(){
 		Holder.holder = make(map[string]*mongo.Client)
 	}
 }
-// type MongoDb struct{
-// 	db *mongo.Client
-// 	uri string
-// }
-// type optionFunc func(*MongoInstance)
-// func (m *MongoDb)GetDbConnection(dbName string, opts ...*options.DatabaseOptions)*mongo.Client{
-// 	if m.db!=nil{
-// 		m.connect()
-// 	}
-// 	return m.db.Database(dbName,opts...).Client()
-// }
+
 func connect(uri string)(*mongo.Client,error){
 	c,err:= mongo.NewClient(options.Client().ApplyURI(uri).SetMaxPoolSize(500).SetMinPoolSize(2))
-	c.Connect(context.Background())
+	if err!=nil{
+		return nil,err
+	}
+	err=c.Connect(context.Background())
 	return c,err
 }
 
