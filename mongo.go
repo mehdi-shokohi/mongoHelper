@@ -7,13 +7,27 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/gridfs"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readconcern"
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 )
 
 var ErrorInsertFailed = errors.New("insert failed with no error")
+func NewMongoGridFs(ctx context.Context, dbId, uri, dbName, bucketName string) (*gridfs.Bucket, error) {
 
+	RWdb, exist := GetClientById(dbId)
+	if !exist {
+		RWdb = New(dbId, uri)
+	}
+	opts := options.GridFSBucket().SetName(bucketName)
+	bucket, err := gridfs.NewBucket(RWdb.Database(dbName), opts)
+	if err != nil {
+		panic(err)
+	}
+	return bucket, err
+
+}
 func NewMongoById[T any](ctx context.Context, dbId,uri,dbName,colName string, model T) MongoContainer[T] {
 	m := MongoContainer[T]{}
 	RWdb,exist:= GetClientById(dbId)
