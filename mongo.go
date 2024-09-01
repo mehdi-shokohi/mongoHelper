@@ -170,7 +170,7 @@ func (m *MongoContainer[T]) FindAll(query *bson.D, opts ...*options.FindOptions)
 }
 
 // CountDocuments returns total documents founded by query.
-func (m *MongoContainer[T]) CountDocuments(query *bson.D) (interface{}, error) {
+func (m *MongoContainer[T]) CountDocuments(query *bson.D,opt ...*options.CountOptions) (int64, error) {
 	return m.GetCollection().CountDocuments(m.Ctx, query)
 }
 
