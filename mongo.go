@@ -50,7 +50,7 @@ type Transaction struct {
 func StartTransaction(Id string, ctx context.Context) (Transaction,error) {
 	tr := Transaction{}
 	dbc, exist := GetClientById(Id)
-	if !exist{ return tr,errors.New("connection Id not found.")}
+	if !exist{ return tr,errors.New("connection Id not found")}
 	tr.ctx = ctx
 	tr.connection = dbc
 	return tr,nil
@@ -58,7 +58,7 @@ func StartTransaction(Id string, ctx context.Context) (Transaction,error) {
 
 func (t *Transaction) EndTransaction(f func(sessionContext mongo.SessionContext) (result interface{}, err error)) (interface{}, error) {
 
-	wc := writeconcern.New(writeconcern.W(1))
+	wc := writeconcern.W1()
 	rc := readconcern.Snapshot()
 	txnOpts := options.Transaction().SetWriteConcern(wc).SetReadConcern(rc)
 
