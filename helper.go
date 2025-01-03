@@ -18,11 +18,10 @@ func Init(){
 }
 
 func connect(uri string)(*mongo.Client,error){
-	c,err:= mongo.NewClient(options.Client().ApplyURI(uri).SetMaxPoolSize(500).SetMinPoolSize(2))
+	c,err:= mongo.Connect(context.Background(),options.Client().ApplyURI(uri).SetMaxPoolSize(500).SetMinPoolSize(2))
 	if err!=nil{
 		return nil,err
 	}
-	err=c.Connect(context.Background())
 	return c,err
 }
 
