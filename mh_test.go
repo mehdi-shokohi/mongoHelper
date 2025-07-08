@@ -31,7 +31,7 @@ func NewMongo[T any](ctx context.Context,collection string , model T)MongoContai
 func TestMongoHelper(t *testing.T) {
 
 	db := NewMongo(context.TODO(), "test", User{})
-	finded, err := db.FindAll(&bson.D{{"userName", "mehdi"}})
+	finded, err := db.FindAll(&bson.D{{"userName", "mehdi1"}})
 	if err != nil {
 		fmt.Println(err)
 	}
