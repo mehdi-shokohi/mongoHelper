@@ -66,12 +66,8 @@ func (t *Transaction) EndTransaction(f func(sessionContext mongo.SessionContext)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := session.WithTransaction(t.ctx, f, txnOpts)
-	if err != nil {
-		err = session.AbortTransaction(t.ctx)
-	}
-
 	defer session.EndSession(t.ctx)
+	resp, err := session.WithTransaction(t.ctx, f, txnOpts)
 	return resp, err
 
 }
